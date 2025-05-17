@@ -56,7 +56,8 @@ supabase_client = SupabaseClient()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://anex-client-1-frontend.vercel.app",  # Production frontend
+        "https://anex-mum-bai-frontend.vercel.app",  # New production frontend
+        "https://anex-client-1-frontend.vercel.app",  # Old production frontend
         "http://localhost:5173",  # Local development frontend
         "*"  # Allow all origins for testing
     ],
