@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: anex-client-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: AZURE_DOCUMENT_AI_KEY
+        sync: false
+      - key: AZURE_DOCUMENT_AI_ENDPOINT
+        sync: false
+      - key: AZURE_DOCUMENT_AI_REGION
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
