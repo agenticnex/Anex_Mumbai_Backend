@@ -25,7 +25,7 @@ from azure_blob_storage import AzureBlobStorage
 
 # Create FastAPI app
 app = FastAPI(title="Document OCR API")
-    from Backend.azure_blob_storage import AzureBlobStorage
+from Backend.azure_blob_storage import AzureBlobStorage
 
 # Create FastAPI app
 app = FastAPI(title="Document OCR API")
