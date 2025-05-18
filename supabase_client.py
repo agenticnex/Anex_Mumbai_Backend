@@ -395,6 +395,8 @@ class SupabaseClient:
 
                     if response.status_code in (200, 201):
                         print("Documents table created successfully!")
+                        # Also create profiles table
+                        self._create_profiles_table()
                         return True
                     else:
                         print(f"Failed to create documents table: {response.text}")
@@ -405,6 +407,75 @@ class SupabaseClient:
 
         except Exception as e:
             print(f"Error creating documents table: {str(e)}")
+            return False
+
+    def _create_profiles_table(self):
+        """Create the profiles table if it doesn't exist."""
+        try:
+            # SQL to create the profiles table
+            sql = """
+            CREATE TABLE IF NOT EXISTS profiles (
+                id UUID PRIMARY KEY,
+                email TEXT NOT NULL,
+                full_name TEXT,
+                avatar_url TEXT,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+
+            -- Create RLS policies for security
+            ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+            -- Allow users to view their own profile
+            CREATE POLICY IF NOT EXISTS "Users can view their own profile"
+                ON profiles FOR SELECT
+                USING (auth.uid() = id);
+
+            -- Allow users to update their own profile
+            CREATE POLICY IF NOT EXISTS "Users can update their own profile"
+                ON profiles FOR UPDATE
+                USING (auth.uid() = id);
+
+            -- Allow users to insert their own profile
+            CREATE POLICY IF NOT EXISTS "Users can insert their own profile"
+                ON profiles FOR INSERT
+                WITH CHECK (auth.uid() = id);
+
+            -- Allow public access for development
+            CREATE POLICY IF NOT EXISTS "Allow public access for development"
+                ON profiles
+                FOR ALL
+                USING (true);
+            """
+
+            # Try to execute the SQL using the REST API
+            with httpx.Client() as client:
+                # We need to use the service role key for this operation
+                service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+                if service_key:
+                    admin_headers = {
+                        "apikey": service_key,
+                        "Authorization": f"Bearer {service_key}",
+                        "Content-Type": "application/json"
+                    }
+
+                    response = client.post(
+                        f"{self.url}/rest/v1/rpc/execute_sql",
+                        headers=admin_headers,
+                        json={"query": sql}
+                    )
+
+                    if response.status_code in (200, 201):
+                        print("Profiles table created successfully!")
+                        return True
+                    else:
+                        print(f"Failed to create profiles table: {response.text}")
+                        return False
+                else:
+                    print("Service role key not found. Cannot create table.")
+                    return False
+
+        except Exception as e:
+            print(f"Error creating profiles table: {str(e)}")
             return False
 
     def delete_document(self, document_id: str) -> bool:
@@ -433,3 +504,116 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error deleting document: {str(e)}")
             return False
+
+    def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a user's profile by ID.
+
+        Args:
+            user_id: The ID of the user
+
+        Returns:
+            Dictionary containing user profile data or None if not found
+        """
+        try:
+            with httpx.Client() as client:
+                response = client.get(
+                    f"{self.base_url}/profiles",
+                    headers=self.headers,
+                    params={"select": "*", "id": f"eq.{user_id}"}
+                )
+
+                if response.status_code == 200 and len(response.json()) > 0:
+                    return response.json()[0]
+                else:
+                    return None
+
+        except Exception as e:
+            print(f"Error retrieving user profile: {str(e)}")
+            return None
+
+    def create_user_profile(self, user_id: str, email: str, full_name: Optional[str] = None, avatar_url: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Create a new user profile.
+
+        Args:
+            user_id: The ID of the user
+            email: The user's email address
+            full_name: The user's full name (optional)
+            avatar_url: URL to the user's avatar image (optional)
+
+        Returns:
+            Dictionary containing the created user profile
+        """
+        try:
+            profile_data = {
+                "id": user_id,
+                "email": email,
+                "full_name": full_name,
+                "avatar_url": avatar_url
+            }
+
+            with httpx.Client() as client:
+                response = client.post(
+                    f"{self.base_url}/profiles",
+                    headers=self.headers,
+                    json=profile_data
+                )
+
+                if response.status_code in (200, 201):
+                    return response.json()[0]
+                else:
+                    print(f"Failed to create user profile: {response.text}")
+                    raise Exception(f"Failed to create user profile: {response.text}")
+
+        except Exception as e:
+            print(f"Error creating user profile: {str(e)}")
+            raise
+
+    def update_user_profile(self, user_id: str, email: str, full_name: Optional[str] = None, avatar_url: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Update an existing user profile.
+
+        Args:
+            user_id: The ID of the user
+            email: The user's email address
+            full_name: The user's full name (optional)
+            avatar_url: URL to the user's avatar image (optional)
+
+        Returns:
+            Dictionary containing the updated user profile
+        """
+        try:
+            profile_data = {
+                "email": email,
+                "updated_at": "now()"
+            }
+
+            if full_name is not None:
+                profile_data["full_name"] = full_name
+
+            if avatar_url is not None:
+                profile_data["avatar_url"] = avatar_url
+
+            with httpx.Client() as client:
+                response = client.patch(
+                    f"{self.base_url}/profiles",
+                    headers=self.headers,
+                    params={"id": f"eq.{user_id}"},
+                    json=profile_data
+                )
+
+                if response.status_code in (200, 201, 204):
+                    # Get the updated profile
+                    updated_profile = self.get_user_profile(user_id)
+                    if updated_profile:
+                        return updated_profile
+                    else:
+                        raise Exception("Failed to retrieve updated profile")
+                else:
+                    print(f"Failed to update user profile: {response.text}")
+                    raise Exception(f"Failed to update user profile: {response.text}")
+
+        except Exception as e:
+            print(f"Error updating user profile: {str(e)}")
+            raise
