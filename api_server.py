@@ -18,14 +18,29 @@ from datetime import datetime
 # Load environment variables
 dotenv.load_dotenv()
 
-# Import our modules directly - no Backend package
-from azure_document_ai import AzureDocumentAI
-from supabase_client import SupabaseClient
-from azure_blob_storage import AzureBlobStorage
-
-# Create FastAPI app
-app = FastAPI(title="Document OCR API")
-from Backend.azure_blob_storage import AzureBlobStorage
+# Import our modules
+# First, try direct imports (when running from the Backend directory)
+# If that fails, try importing from Backend package (when running from root)
+# If both fail, print helpful error message
+try:
+    from azure_document_ai import AzureDocumentAI
+    from supabase_client import SupabaseClient
+    from azure_blob_storage import AzureBlobStorage
+    print("Successfully imported modules directly")
+except ImportError as e1:
+    try:
+        from Backend.azure_document_ai import AzureDocumentAI
+        from Backend.supabase_client import SupabaseClient
+        from Backend.azure_blob_storage import AzureBlobStorage
+        print("Successfully imported modules from Backend package")
+    except ImportError as e2:
+        print("ERROR: Failed to import required modules")
+        print("First attempt error:", str(e1))
+        print("Second attempt error:", str(e2))
+        print("Current directory:", os.getcwd())
+        print("Directory contents:", os.listdir())
+        # Re-raise the exception
+        raise
 
 # Create FastAPI app
 app = FastAPI(title="Document OCR API")
